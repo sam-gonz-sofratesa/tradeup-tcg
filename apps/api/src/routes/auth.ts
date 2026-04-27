@@ -4,29 +4,59 @@ import { User } from "@tradeup/db";
 
 export const authRoutes = new Hono();
 
+/**
+ * POST /api/auth/sync
+ * Called by the frontend right after Clerk sign-in / sign-up.
+ * Creates or updates the MongoDB User document.
+ *
+ * Frontend sends: Authorization: Bearer <clerk_session_token>
+ */
 authRoutes.post("/sync", requireAuth, async (c) => {
-  const clerkId = c.get("userId") as string;
-  const role =
-    (c.get("role") as "buyer" | "seller" | "admin" | undefined) ?? "buyer";
+  const clerkId = c.get("userId");
+  const role = c.get("role") ?? "buyer";
 
-  const clerkUser = await clerkClient.users.getUser(clerkId);
+  // Fetch user details from Clerk
+  let clerkUser;
+  try {
+    clerkUser = await clerkClient.users.getUser(clerkId);
+  } catch {
+    return c.json({ error: "Failed to fetch user data from Clerk" }, 502);
+  }
 
+  // Resolve primary email
   const primaryEmail =
     clerkUser.emailAddresses.find(
-      (email) => email.id === clerkUser.primaryEmailAddressId,
+      (e) => e.id === clerkUser.primaryEmailAddressId,
     )?.emailAddress ?? "";
 
+  if (!primaryEmail) {
+    return c.json({ error: "Clerk user has no verified email address" }, 400);
+  }
+
+  // Generate a username: clerk username → firstName-lastSixChars
   const username =
     clerkUser.username ??
-    `${clerkUser.firstName ?? "user"}-${clerkUser.id.slice(-6)}`.toLowerCase();
+    `${(clerkUser.firstName ?? "user").toLowerCase()}-${clerkUser.id.slice(-6)}`;
 
+  // Upsert: create on first sync, update fields on subsequent calls
   const user = await User.findOneAndUpdate(
     { clerkId },
     {
-      clerkId,
-      email: primaryEmail,
-      username,
-      role,
+      $set: {
+        email: primaryEmail,
+        username,
+        // Only allow role update if it's explicitly set via Clerk metadata
+        // (avoids overwriting an admin role with 'buyer' on re-sync)
+        ...(role !== "buyer" ? { role } : {}),
+      },
+      $setOnInsert: {
+        clerkId,
+        role: "buyer", // Default role on first creation
+        reputation: 0,
+        reviewCount: 0,
+        stripeConnectStatus: "none",
+        isBanned: false,
+      },
     },
     {
       new: true,
@@ -44,6 +74,7 @@ authRoutes.post("/sync", requireAuth, async (c) => {
       username: user.username,
       role: user.role,
       stripeConnectStatus: user.stripeConnectStatus,
+      reputation: user.reputation,
     },
   });
 });
