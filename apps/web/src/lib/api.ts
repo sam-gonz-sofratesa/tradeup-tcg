@@ -1,80 +1,86 @@
 import { useAuth } from '@clerk/clerk-react'
 
-const BASE = import.meta.env['VITE_API_URL'] ?? 'http://localhost:3001'
+const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
-async function authFetch(token: string | null, path: string, init: RequestInit = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  })
+async function request(url: string, options: RequestInit = {}, token?: string) {
+  const headers: Record<string, string> = {
+    ...(options.body && !(options.body instanceof FormData)
+      ? { 'Content-Type': 'application/json' }
+      : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string> ?? {}),
+  }
+  const res = await fetch(`${BASE}${url}`, { ...options, headers })
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error((body as any)?.error ?? `HTTP ${res.status}`)
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data as any).error ?? `HTTP ${res.status}`)
   }
   return res.json()
 }
 
+// Unauthenticated api (public endpoints)
 export const api = {
   listings: {
     list: (params?: Record<string, string>) => {
       const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-      return authFetch(null, `/api/listings${qs}`)
+      return request(`/api/listings${qs}`)
     },
-    get: (id: string) => authFetch(null, `/api/listings/${id}`),
+    get: (id: string) => request(`/api/listings/${id}`),
   },
   catalog: {
     search: (q: string, game?: string) =>
-      authFetch(null, `/api/catalog/search?q=${encodeURIComponent(q)}${game ? `&game=${game}` : ''}`),
+      request(`/api/catalog/search?q=${encodeURIComponent(q)}${game ? `&game=${game}` : ''}`),
   },
   store: {
-    list: (params?: Record<string, string>) => {
-      const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-      return authFetch(null, `/api/store${qs}`)
-    },
+    list: () => request(`/api/store`),
+    get: (id: string) => request(`/api/store/${id}`),
+  },
+  users: {
+    profile: (id: string) => request(`/api/users/${id}/profile`),
   },
 }
 
+// Authenticated api — returns callable methods with token injected
 export function useApi() {
   const { getToken } = useAuth()
 
-  async function authed(path: string, init: RequestInit = {}) {
+  async function authRequest(url: string, options: RequestInit = {}) {
     const token = await getToken()
-    return authFetch(token, path, init)
+    return request(url, options, token ?? undefined)
   }
 
   return {
     auth: {
-      sync: () => authed('/api/auth/sync', { method: 'POST' }),
-    },
-    offers: {
-      list: () => authed('/api/offers'),
-      create: (data: object) =>
-        authed('/api/offers', { method: 'POST', body: JSON.stringify(data) }),
-      accept: (id: string) => authed(`/api/offers/${id}/accept`, { method: 'POST' }),
-      decline: (id: string) => authed(`/api/offers/${id}/decline`, { method: 'POST' }),
-      cancel: (id: string) => authed(`/api/offers/${id}/cancel`, { method: 'POST' }),
-    },
-    dashboard: {
-      get: () => authed('/api/users/me/dashboard'),
-      stripeOnboard: () => authed('/api/users/me/stripe-onboard', { method: 'POST' }),
-    },
-    transactions: {
-      list: (page = 1) => authed(`/api/transactions/me?page=${page}`),
+      sync: () => authRequest('/api/auth/sync', { method: 'POST' }),
     },
     listings: {
-      create: async (data: FormData) => {
-        const token = await getToken()
-        return fetch(`${BASE}/api/listings`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token ?? ''}` },
-          body: data,
-        }).then((r) => r.json())
+      list: (params?: Record<string, string>) => {
+        const qs = params ? '?' + new URLSearchParams(params).toString() : ''
+        return authRequest(`/api/listings${qs}`)
       },
-      delete: (id: string) => authed(`/api/listings/${id}`, { method: 'DELETE' }),
+      get: (id: string) => authRequest(`/api/listings/${id}`),
+      create: (body: FormData) => authRequest('/api/listings', { method: 'POST', body }),
+      delete: (id: string) => authRequest(`/api/listings/${id}`, { method: 'DELETE' }),
+    },
+    offers: {
+      create: (body: object) =>
+        authRequest('/api/offers', { method: 'POST', body: JSON.stringify(body) }),
+      accept: (id: string) => authRequest(`/api/offers/${id}/accept`, { method: 'POST' }),
+      decline: (id: string) => authRequest(`/api/offers/${id}/decline`, { method: 'POST' }),
+      cancel: (id: string) => authRequest(`/api/offers/${id}/cancel`, { method: 'POST' }),
+    },
+    payments: {
+      c2cIntent: (body: { listingId: string; amount: number }) =>
+        authRequest('/api/payments/c2c-intent', { method: 'POST', body: JSON.stringify(body) }),
+      storeIntent: (body: { storeItemId: string }) =>
+        authRequest('/api/payments/store-intent', { method: 'POST', body: JSON.stringify(body) }),
+    },
+    dashboard: {
+      get: () => authRequest('/api/users/me/dashboard'),
+      stripeOnboard: () => authRequest('/api/users/me/stripe-onboard', { method: 'POST' }),
+    },
+    users: {
+      profile: (id: string) => authRequest(`/api/users/${id}/profile`),
     },
   }
 }
