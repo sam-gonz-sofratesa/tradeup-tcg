@@ -98,19 +98,21 @@ export function MarketplacePage() {
 
 function ListingCard({ listing }: { listing: any }) {
   const card = listing.catalogCard
-  const photo = listing.photos?.[0]
+  // Prioridad: foto subida por el vendedor → imageUrl del catálogo → placeholder
+  const image = listing.photos?.[0] ?? card?.imageUrl ?? null
+
   return (
     <Link to={`/listings/${listing._id}`} className="group block rounded-[var(--radius-card)] bg-[var(--color-surface-2)] border border-[var(--color-border)] overflow-hidden card-glow">
       <div className="aspect-[3/4] bg-[var(--color-surface-3)] relative overflow-hidden">
-        {photo ? (
-          <img src={photo} alt={card?.name ?? 'Card'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        {image ? (
+          <img src={image} alt={card?.name ?? 'Card'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-4xl text-[var(--color-muted)]/30">🃏</div>
         )}
         <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-xs font-medium bg-black/60 text-white backdrop-blur-sm">{listing.condition}</span>
         <div className="absolute top-2 right-2 flex gap-1">
-          {listing.acceptsMoney && <span className="w-5 h-5 rounded-full bg-green-500/80 flex items-center justify-center text-xs">$</span>}
-          {listing.acceptsTrades && <span className="w-5 h-5 rounded-full bg-blue-500/80 flex items-center justify-center text-xs">↔</span>}
+          {listing.askingPrice && <span className="w-5 h-5 rounded-full bg-green-500/80 flex items-center justify-center text-xs">$</span>}
+          {!listing.askingPrice && <span className="w-5 h-5 rounded-full bg-blue-500/80 flex items-center justify-center text-xs">↔</span>}
         </div>
       </div>
       <div className="p-3">
@@ -118,8 +120,8 @@ function ListingCard({ listing }: { listing: any }) {
         <p className="text-xs text-[var(--color-muted)] truncate mt-0.5">{card?.set ?? ''}</p>
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-[var(--color-muted)]">{listing.seller?.username ?? ''}</span>
-          {listing.price
-            ? <span className="text-sm font-semibold text-[var(--color-brand-light)]">${(listing.price / 100).toFixed(2)}</span>
+          {listing.askingPrice
+            ? <span className="text-sm font-semibold text-[var(--color-brand-light)]">${(listing.askingPrice / 100).toFixed(2)}</span>
             : <span className="text-xs text-[var(--color-muted)]">Solo trade</span>}
         </div>
       </div>

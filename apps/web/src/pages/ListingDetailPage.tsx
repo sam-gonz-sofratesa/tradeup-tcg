@@ -26,6 +26,8 @@ export function ListingDetailPage() {
 
   const listing = data?.listing
   const card = listing?.catalogCard
+  // Prioridad: foto subida → imageUrl del catálogo
+  const image = listing?.photos?.[0] ?? card?.imageUrl ?? null
 
   async function sendOffer() {
     if (!offerType) return
@@ -63,27 +65,43 @@ export function ListingDetailPage() {
     <div className="max-w-5xl mx-auto px-4 py-10">
       <Link to="/marketplace" className="text-sm text-[var(--color-muted)] hover:text-white transition-colors mb-6 inline-block">← Volver al marketplace</Link>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Photos */}
-        <div className="space-y-3">
+        {/* Photo */}
+        <div>
           <div className="aspect-[3/4] rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)] overflow-hidden">
-            {listing.photos?.[0]
-              ? <img src={listing.photos[0]} alt={card?.name} className="w-full h-full object-cover" />
+            {image
+              ? <img src={image} alt={card?.name} className="w-full h-full object-cover" />
               : <div className="w-full h-full flex items-center justify-center text-6xl text-[var(--color-muted)]/20">🃏</div>}
           </div>
+          {/* Miniaturas de fotos adicionales */}
+          {listing.photos?.length > 1 && (
+            <div className="flex gap-2 mt-2">
+              {listing.photos.map((p: string, i: number) => (
+                <div key={i} className="w-16 h-20 rounded-lg overflow-hidden border border-[var(--color-border)]">
+                  <img src={p} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
         {/* Details */}
         <div>
           <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-1">{card?.game}</p>
           <h1 className="font-display text-2xl font-bold text-white mb-1">{card?.name}</h1>
-          <p className="text-[var(--color-muted)] text-sm mb-6">{card?.set} · #{card?.cardNumber} · {card?.rarity}</p>
+          <p className="text-[var(--color-muted)] text-sm mb-6">{card?.set}{card?.cardNumber ? ` · #${card.cardNumber}` : ''}{card?.rarity ? ` · ${card.rarity}` : ''}</p>
+
           <div className="flex items-center gap-4 mb-6">
             <span className="px-3 py-1 rounded-lg bg-[var(--color-surface-3)] border border-[var(--color-border)] text-sm">
               {CONDITION_LABELS[listing.condition] ?? listing.condition}
             </span>
-            {listing.price && (
-              <span className="text-2xl font-bold text-[var(--color-brand-light)]">${(listing.price / 100).toFixed(2)}</span>
+            {listing.askingPrice && (
+              <span className="text-2xl font-bold text-[var(--color-brand-light)]">${(listing.askingPrice / 100).toFixed(2)}</span>
+            )}
+            {!listing.askingPrice && (
+              <span className="text-sm text-blue-400">↔ Solo trade</span>
             )}
           </div>
+
           <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)] mb-6">
             <div className="w-10 h-10 rounded-full bg-[var(--color-brand)]/20 flex items-center justify-center text-lg">👤</div>
             <div>
@@ -91,7 +109,6 @@ export function ListingDetailPage() {
               <p className="text-xs text-[var(--color-muted)]">⭐ {listing.seller?.reputation?.toFixed(1) ?? '–'} · {listing.seller?.reviewCount ?? 0} reviews</p>
             </div>
           </div>
-          {listing.description && <p className="text-sm text-[var(--color-muted)] mb-6 leading-relaxed">{listing.description}</p>}
 
           <SignedOut>
             <SignInButton mode="modal">
@@ -100,9 +117,10 @@ export function ListingDetailPage() {
               </button>
             </SignInButton>
           </SignedOut>
+
           <SignedIn>
             {success ? (
-              <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm text-center">✅ Oferta enviada</div>
+              <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm text-center">✅ Oferta enviada exitosamente</div>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-white">Hacer una oferta</p>
