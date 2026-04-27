@@ -18,7 +18,6 @@ async function request(url: string, options: RequestInit = {}, token?: string) {
   return res.json()
 }
 
-// Unauthenticated api (public endpoints)
 export const api = {
   listings: {
     list: (params?: Record<string, string>) => {
@@ -32,7 +31,10 @@ export const api = {
       request(`/api/catalog/search?q=${encodeURIComponent(q)}${game ? `&game=${game}` : ''}`),
   },
   store: {
-    list: () => request(`/api/store`),
+    list: (params?: Record<string, string>) => {
+      const qs = params ? '?' + new URLSearchParams(params).toString() : ''
+      return request(`/api/store${qs}`)
+    },
     get: (id: string) => request(`/api/store/${id}`),
   },
   users: {
@@ -40,7 +42,6 @@ export const api = {
   },
 }
 
-// Authenticated api — returns callable methods with token injected
 export function useApi() {
   const { getToken } = useAuth()
 
