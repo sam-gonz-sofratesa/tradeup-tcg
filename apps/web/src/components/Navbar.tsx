@@ -21,6 +21,7 @@ export function Navbar() {
           <NavLink to="/store" className={linkClass}>Tienda</NavLink>
           <SignedIn>
             <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
+            <NavLink to="/orders" className={linkClass}>Mis Pedidos</NavLink>
           </SignedIn>
         </div>
 

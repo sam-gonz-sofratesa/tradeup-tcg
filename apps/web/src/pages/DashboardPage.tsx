@@ -73,7 +73,7 @@ export function DashboardPage() {
             <span className="ml-1 capitalize">{user?.role}</span>
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {user?.stripeConnectStatus !== 'active' && (
             <button
               onClick={() => stripeOnboard.mutate()}
@@ -83,6 +83,13 @@ export function DashboardPage() {
               {stripeOnboard.isPending ? 'Redirigiendo...' : '💳 Conectar Stripe'}
             </button>
           )}
+          {/* Acceso rápido a Mis Pedidos */}
+          <Link
+            to="/orders"
+            className="px-4 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-muted)] text-sm font-medium hover:text-white hover:border-[var(--color-brand)]/50 transition-all"
+          >
+            📦 Mis Pedidos
+          </Link>
           <Link
             to="/listings/new"
             className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand)]/90 transition-all"
@@ -142,7 +149,6 @@ export function DashboardPage() {
             <div key={offer._id} className="p-4 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)]">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  {/* Imagen de la carta */}
                   <div className="w-10 h-14 rounded bg-[var(--color-surface-3)] overflow-hidden shrink-0">
                     {offer.listing?.catalogCard?.imageUrl
                       ? <img src={offer.listing.catalogCard.imageUrl} alt="" className="w-full h-full object-cover" />
