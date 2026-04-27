@@ -54,7 +54,8 @@ function StorePaymentForm({ amount, onSuccess, onCancel }: {
         <PaymentElement options={{ layout: 'tabs' }} />
       </div>
       {errorMsg && <p className="text-red-400 text-sm">{errorMsg}</p>}
-      <div className="flex gap-3">
+      {/* Botones siempre visibles al fondo del scroll */}
+      <div className="flex gap-3 pt-1">
         <button type="button" onClick={onCancel}
           className="flex-1 py-2.5 rounded-xl border border-[var(--color-border)] text-[var(--color-muted)] text-sm hover:text-white transition-colors">
           Cancelar
@@ -96,9 +97,16 @@ export function StoreCheckoutModal({ item, onClose, onSuccess }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-[var(--color-surface-1)] border border-[var(--color-border)] p-6 shadow-2xl">
-
+    // Overlay: flex centrado, pero permite scroll en pantallas pequeñas
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-8 bg-black/70 backdrop-blur-sm overflow-y-auto"
+      onClick={onClose}
+    >
+      {/* Modal: crece con el contenido, no tiene max-height fijo */}
+      <div
+        className="w-full max-w-md rounded-2xl bg-[var(--color-surface-1)] border border-[var(--color-border)] p-6 shadow-2xl mb-8"
+        onClick={(e) => e.stopPropagation()}
+      >
         {purchased ? (
           <div className="text-center py-8">
             <p className="text-5xl mb-4">🎉</p>
@@ -107,7 +115,7 @@ export function StoreCheckoutModal({ item, onClose, onSuccess }: {
           </div>
         ) : (
           <>
-            {/* Header con info del item */}
+            {/* Header — sticky para que siempre sea visible */}
             <div className="flex items-center gap-4 mb-5">
               <div className="w-14 h-20 rounded-lg overflow-hidden bg-[var(--color-surface-3)] shrink-0">
                 {image
@@ -125,7 +133,7 @@ export function StoreCheckoutModal({ item, onClose, onSuccess }: {
             </div>
 
             {/* Resumen de precio */}
-            <div className="flex justify-between items-center p-3 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)] mb-5">
+            <div className="flex justify-between items-center p-3 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)] mb-4">
               <div className="text-sm text-[var(--color-muted)]">
                 <p>Subtotal</p>
                 <p className="mt-0.5">Envío</p>
