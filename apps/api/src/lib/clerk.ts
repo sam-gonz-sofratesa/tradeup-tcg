@@ -1,60 +1,79 @@
-import { createClerkClient, verifyToken } from "@clerk/backend";
-import type { Context, Next } from "hono";
+import { createClerkClient, verifyToken } from '@clerk/backend'
+import type { Context, Next } from 'hono'
 
+// ─── Exported type used by types.d.ts ────────────────────────────────────────
+export type AppRole = 'buyer' | 'seller' | 'admin'
+
+// ─── Clerk client (for users.getUser, updateUserMetadata, etc.) ──────────────
 export const clerkClient = createClerkClient({
-  secretKey: process.env["CLERK_SECRET_KEY"],
-});
+  secretKey: process.env['CLERK_SECRET_KEY'],
+  publishableKey: process.env['CLERK_PUBLISHABLE_KEY'],
+})
 
-/**
- * Middleware factory: verifies Clerk session token from Authorization header.
- * Attaches userId and role to context.
- */
-
+// ─── requireAuth ─────────────────────────────────────────────────────────────
+// verifyToken is a STANDALONE function from @clerk/backend — not a method on
+// the ClerkClient instance. Import it directly and call it with secretKey.
 export async function requireAuth(c: Context, next: Next) {
-  const token = c.req.header("Authorization")?.replace("Bearer ", "");
-  if (!token) return c.json({ error: "Unauthorized" }, 401);
+  const authorization = c.req.header('Authorization')
+  const token = authorization?.startsWith('Bearer ')
+    ? authorization.replace('Bearer ', '')
+    : undefined
+
+  if (!token) {
+    return c.json({ error: 'Unauthorized: missing bearer token' }, 401)
+  }
+
+  const secretKey = process.env['CLERK_SECRET_KEY']
+  if (!secretKey) {
+    return c.json({ error: 'Server misconfiguration: missing CLERK_SECRET_KEY' }, 500)
+  }
 
   try {
-    const payload = await clerkClient.verifyToken(token);
-    c.set("userId", payload.sub);
-    c.set(
-      "role",
-      (payload as any)["org_role"] ??
-        (payload as any)["metadata"]?.role ??
-        "buyer",
-    );
-    await next();
+    // ✅ Correct: standalone verifyToken(token, options)
+    const payload = await verifyToken(token, {
+      secretKey,
+      authorizedParties: [
+        process.env['CORS_ORIGIN'] ?? 'http://localhost:3000',
+        process.env['CORS_ORIGIN_BACKOFFICE'] ?? 'http://localhost:3002',
+      ],
+    })
+
+    const role: AppRole =
+      (payload as any)?.public_metadata?.role ??
+      (payload as any)?.metadata?.role ??
+      'buyer'
+
+    c.set('userId', payload.sub)
+    c.set('role', role)
+
+    await next()
   } catch {
-    return c.json({ error: "Invalid token" }, 401);
+    return c.json({ error: 'Unauthorized: invalid or expired token' }, 401)
   }
 }
 
+// ─── requireSeller ────────────────────────────────────────────────────────────
 export async function requireSeller(c: Context, next: Next) {
-  await requireAuth(c, async () => {});
-  const role = c.get("role");
-  if (!role) return c.json({ error: "Unauthorized" }, 401);
-  if (role !== "seller" && role !== "admin") {
-    return c.json({ error: "Forbidden: seller role required" }, 403);
+  let passed = false
+  await requireAuth(c, async () => { passed = true })
+  if (!passed) return
+
+  const role = c.get('role')
+  if (role !== 'seller' && role !== 'admin') {
+    return c.json({ error: 'Forbidden: seller role required' }, 403)
   }
-  await next();
+  await next()
 }
 
-export async function requireSeller(c: Context, next: Next) {
-  await requireAuth(c, async () => {});
-  const role = c.get("role");
-  if (!role) return c.json({ error: "Unauthorized" }, 401);
-  if (role !== "seller" && role !== "admin") {
-    return c.json({ error: "Forbidden: seller role required" }, 403);
-  }
-  await next();
-}
-
+// ─── requireAdmin ─────────────────────────────────────────────────────────────
 export async function requireAdmin(c: Context, next: Next) {
-  await requireAuth(c, async () => {});
-  const role = c.get("role");
-  if (!role) return c.json({ error: "Unauthorized" }, 401);
-  if (role !== "admin") {
-    return c.json({ error: "Forbidden: admin role required" }, 403);
+  let passed = false
+  await requireAuth(c, async () => { passed = true })
+  if (!passed) return
+
+  const role = c.get('role')
+  if (role !== 'admin') {
+    return c.json({ error: 'Forbidden: admin role required' }, 403)
   }
-  await next();
+  await next()
 }
