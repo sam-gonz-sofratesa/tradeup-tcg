@@ -5,9 +5,6 @@ import { User, Listing, StoreItem, Transaction } from '@tradeup/db'
 
 export const paymentRoutes = new Hono()
 
-/**
- * POST /api/payments/c2c-intent
- */
 paymentRoutes.post('/c2c-intent', requireAuth, async (c) => {
   const clerkId = c.get('userId')
   const { listingId, amount } = await c.req.json()
@@ -63,8 +60,7 @@ paymentRoutes.post('/c2c-intent', requireAuth, async (c) => {
 
 /**
  * POST /api/payments/store-intent
- * B2C — crea la Transaction aqui mismo en estado 'pending'.
- * El webhook la completa cuando Stripe confirma el pago.
+ * B2C — seller is null (TradeUp is merchant), isBuyerPurchase = true
  */
 paymentRoutes.post('/store-intent', requireAuth, async (c) => {
   const clerkId = c.get('userId')
@@ -80,7 +76,8 @@ paymentRoutes.post('/store-intent', requireAuth, async (c) => {
   if (!item) return c.json({ error: 'Item not found' }, 404)
   if (!item.isActive || item.stock < 1) return c.json({ error: 'Item out of stock' }, 400)
 
-  // B2C: sin transfer_data ni application_fee_amount
+  const card = item.catalogCard as any
+
   const paymentIntent = await stripe.paymentIntents.create({
     amount: item.price,
     currency: 'usd',
@@ -93,22 +90,29 @@ paymentRoutes.post('/store-intent', requireAuth, async (c) => {
     },
   })
 
-  // Crear Transaction en estado pending para que el webhook la encuentre
-  // seller = buyer aqui (TradeUp no tiene un User vendedor separado),
-  // usamos el mismo buyer como placeholder; el webhook solo actualiza status.
+  // seller = null, isBuyerPurchase = true, snapshot of item for order detail
   await Transaction.create({
     buyer: buyer._id,
-    seller: buyer._id,   // B2C: TradeUp es el vendedor, no hay User seller
+    seller: null,
+    isBuyerPurchase: true,
     type: 'b2c',
     grossAmount: item.price,
     stripePaymentIntentId: paymentIntent.id,
     status: 'pending',
+    shippingStatus: 'pending',
+    storeItemSnapshot: {
+      name: card?.name,
+      imageUrl: card?.imageUrl,
+      condition: item.condition,
+      set: card?.set,
+      storeItemId: String(item._id),
+    },
   })
 
   return c.json({
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     amount: item.price,
-    itemName: (item.catalogCard as any)?.name ?? 'Item',
+    itemName: card?.name ?? 'Item',
   })
 })
