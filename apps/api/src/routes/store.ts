@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { bodyLimit } from 'hono/body-limit'
 import { requireAuth, requireAdmin } from '../lib/clerk.js'
-import { stripe, calculateCommission } from '../lib/stripe.js'
+import { stripe } from '../lib/stripe.js'
 import { StoreItem, CatalogCard, User, Transaction } from '@tradeup/db'
 import { saveFile } from '../lib/storage.js'
 
@@ -24,23 +24,59 @@ const MAX_PHOTOS = 5
 
 // ─── GET /api/store ───────────────────────────────────────────────────────────
 storeRoutes.get('/', async (c) => {
-  const { page = '1', limit = '20', game } = c.req.query()
+  const {
+    page = '1',
+    limit = '20',
+    game,
+    condition,
+    minPrice,
+    maxPrice,
+    graded,       // 'true' | 'false'
+    q,            // text search
+    sort = 'newest', // newest | oldest | price_asc | price_desc
+  } = c.req.query()
+
   const pageNum = Math.max(Number(page) || 1, 1)
   const limitNum = Math.min(Number(limit) || 20, 50)
 
-  const items = await StoreItem.find({ isActive: true, stock: { $gt: 0 } })
-    .populate({
-      path: 'catalogCard',
-      ...(game ? { match: { game } } : {}),
-    })
-    .sort({ createdAt: -1 })
-    .skip((pageNum - 1) * limitNum)
-    .limit(limitNum)
+  // Build catalogCard match for game + text search
+  const cardMatch: Record<string, unknown> = {}
+  if (game) cardMatch['game'] = game
+  if (q) cardMatch['name'] = { $regex: q.trim(), $options: 'i' }
 
-  const filtered = items.filter((i) => i.catalogCard !== null)
-  const total = await StoreItem.countDocuments({ isActive: true, stock: { $gt: 0 } })
+  // Build StoreItem filter
+  const itemFilter: Record<string, unknown> = { isActive: true, stock: { $gt: 0 } }
+  if (condition) itemFilter['condition'] = condition
+  if (graded === 'true') itemFilter['isGraded'] = true
+  if (graded === 'false') itemFilter['isGraded'] = { $ne: true }
+  if (minPrice || maxPrice) {
+    const priceFilter: Record<string, number> = {}
+    if (minPrice) priceFilter['$gte'] = Number(minPrice)
+    if (maxPrice) priceFilter['$lte'] = Number(maxPrice)
+    itemFilter['price'] = priceFilter
+  }
 
-  return c.json({ items: filtered, total, page: pageNum, limit: limitNum })
+  // Sort
+  const sortMap: Record<string, Record<string, 1 | -1>> = {
+    newest:     { createdAt: -1 },
+    oldest:     { createdAt:  1 },
+    price_asc:  { price:  1 },
+    price_desc: { price: -1 },
+  }
+  const sortObj = sortMap[sort] ?? sortMap['newest']
+
+  // Fetch with populated catalogCard
+  const allItems = await StoreItem.find(itemFilter)
+    .populate({ path: 'catalogCard', match: Object.keys(cardMatch).length ? cardMatch : undefined })
+    .sort(sortObj)
+
+  // Filter out items where catalogCard didn't match
+  const filtered = allItems.filter((i) => i.catalogCard !== null)
+
+  const total = filtered.length
+  const paginated = filtered.slice((pageNum - 1) * limitNum, pageNum * limitNum)
+
+  return c.json({ items: paginated, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) })
 })
 
 // ─── GET /api/store/:id ───────────────────────────────────────────────────────
@@ -59,11 +95,12 @@ storeRoutes.post('/:id/buy', requireAuth, async (c) => {
   if (!buyer) return c.json({ error: 'User not synced' }, 400)
   if (buyer.isBanned) return c.json({ error: 'Account banned' }, 403)
 
-  const item = await StoreItem.findById(id)
+  const item = await StoreItem.findById(id).populate('catalogCard')
   if (!item || !item.isActive) return c.json({ error: 'Item not found or unavailable' }, 404)
   if (item.stock < 1) return c.json({ error: 'Out of stock' }, 400)
 
-  // B2C: direct charge, TradeUp is the merchant (no Stripe Connect needed)
+  const card = item.catalogCard as any
+
   const pi = await stripe.paymentIntents.create({
     amount: item.price,
     currency: 'usd',
@@ -75,24 +112,28 @@ storeRoutes.post('/:id/buy', requireAuth, async (c) => {
     },
   })
 
-  // Create a pending transaction; webhook will complete it
   await Transaction.create({
     buyer: buyer._id,
-    seller: buyer._id, // placeholder — TradeUp is seller in B2C
+    seller: null,
+    isBuyerPurchase: true,
     type: 'b2c',
     grossAmount: item.price,
-    commissionAmount: 0, // no commission on own store
+    commissionAmount: 0,
     netAmount: item.price,
     stripePaymentIntentId: pi.id,
     status: 'pending',
+    shippingStatus: 'pending',
     reviewEligible: false,
+    storeItemSnapshot: {
+      name: card?.name,
+      imageUrl: card?.imageUrl,
+      condition: item.condition,
+      set: card?.set,
+      storeItemId: String(item._id),
+    },
   })
 
-  return c.json({
-    message: 'Payment initiated',
-    clientSecret: pi.client_secret,
-    amount: item.price,
-  })
+  return c.json({ message: 'Payment initiated', clientSecret: pi.client_secret, amount: item.price })
 })
 
 // ─── POST /api/store — admin ──────────────────────────────────────────────────
@@ -126,10 +167,7 @@ storeRoutes.post(
       ? photoField.filter((f): f is File => f instanceof File)
       : photoField instanceof File ? [photoField] : []
 
-    if (files.length > MAX_PHOTOS) {
-      return c.json({ error: `Maximum ${MAX_PHOTOS} photos allowed` }, 400)
-    }
-
+    if (files.length > MAX_PHOTOS) return c.json({ error: `Maximum ${MAX_PHOTOS} photos allowed` }, 400)
     const badType = files.find((f) => !ALLOWED_MIME_TYPES.includes(f.type))
     if (badType) return c.json({ error: `Invalid file type: ${badType.type}` }, 400)
 
@@ -156,14 +194,12 @@ storeRoutes.post(
 storeRoutes.patch('/:id', requireAdmin, async (c) => {
   const { id } = c.req.param()
   const body = await c.req.json()
-
   const item = await StoreItem.findByIdAndUpdate(id, { $set: body }, { new: true, runValidators: true })
   if (!item) return c.json({ error: 'Item not found' }, 404)
-
   return c.json({ message: 'Store item updated', item })
 })
 
-// ─── DELETE /api/store/:id — admin (soft delete) ──────────────────────────────
+// ─── DELETE /api/store/:id — admin ───────────────────────────────────────────
 storeRoutes.delete('/:id', requireAdmin, async (c) => {
   const { id } = c.req.param()
   const item = await StoreItem.findByIdAndUpdate(id, { isActive: false }, { new: true })
