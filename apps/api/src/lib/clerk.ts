@@ -9,7 +9,6 @@ export const clerkClient = createClerkClient({
  * Middleware factory: verifies Clerk session token from Authorization header.
  * Attaches userId and role to context.
  */
-import type { Context, Next } from "hono";
 
 export async function requireAuth(c: Context, next: Next) {
   const token = c.req.header("Authorization")?.replace("Bearer ", "");
