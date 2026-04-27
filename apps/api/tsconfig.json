@@ -2,7 +2,21 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    // rootDir removed: monorepo packages live outside apps/api/src
+    // composite + paths let TS resolve @tradeup/db, @tradeup/shared, etc.
+    "composite": true,
+    "paths": {
+      "@tradeup/db": ["../../packages/db/src/index.ts"],
+      "@tradeup/shared": ["../../packages/shared/src/index.ts"],
+      "@tradeup/ui": ["../../packages/ui/src/index.ts"]
+    }
   },
-  "include": ["src"]
+  "include": [
+    "src/**/*",
+    "src/types.d.ts"
+  ],
+  "references": [
+    { "path": "../../packages/db" },
+    { "path": "../../packages/shared" }
+  ]
 }
