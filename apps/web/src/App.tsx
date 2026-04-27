@@ -7,6 +7,7 @@ import { ListingDetailPage } from './pages/ListingDetailPage'
 import { StorePage } from './pages/StorePage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CreateListingPage } from './pages/CreateListingPage'
+import { UserProfilePage } from './pages/UserProfilePage'
 import { useAuthSync } from './hooks/useAuthSync'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -21,7 +22,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  // Se ejecuta una vez por sesion automaticamente
   useAuthSync()
 
   return (
@@ -31,6 +31,7 @@ function AppRoutes() {
         <Route path="/marketplace" element={<MarketplacePage />} />
         <Route path="/listings/:id" element={<ListingDetailPage />} />
         <Route path="/store" element={<StorePage />} />
+        <Route path="/users/:id" element={<UserProfilePage />} />
         <Route
           path="/dashboard"
           element={
