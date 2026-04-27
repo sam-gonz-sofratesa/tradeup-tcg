@@ -25,6 +25,15 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <SignedIn>
+            <Link
+              to="/listings/new"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[var(--color-brand)]/20 border border-[var(--color-brand)]/40 text-[var(--color-brand-light)] text-sm font-medium hover:bg-[var(--color-brand)]/30 transition-all"
+            >
+              + Publicar carta
+            </Link>
+            <UserButton appearance={{ elements: { avatarBox: 'w-8 h-8' } }} />
+          </SignedIn>
           <SignedOut>
             <SignInButton mode="modal">
               <button className="text-sm px-4 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-white hover:border-[var(--color-brand)] transition-all">
@@ -32,9 +41,6 @@ export function Navbar() {
               </button>
             </SignInButton>
           </SignedOut>
-          <SignedIn>
-            <UserButton appearance={{ elements: { avatarBox: 'w-8 h-8' } }} />
-          </SignedIn>
         </div>
       </nav>
     </header>

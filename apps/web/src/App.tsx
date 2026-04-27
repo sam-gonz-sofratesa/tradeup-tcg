@@ -6,6 +6,7 @@ import { MarketplacePage } from './pages/MarketplacePage'
 import { ListingDetailPage } from './pages/ListingDetailPage'
 import { StorePage } from './pages/StorePage'
 import { DashboardPage } from './pages/DashboardPage'
+import { CreateListingPage } from './pages/CreateListingPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth()
@@ -31,6 +32,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/listings/new"
+          element={
+            <ProtectedRoute>
+              <CreateListingPage />
             </ProtectedRoute>
           }
         />
