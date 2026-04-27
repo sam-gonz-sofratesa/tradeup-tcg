@@ -7,6 +7,7 @@ import { ListingDetailPage } from './pages/ListingDetailPage'
 import { StorePage } from './pages/StorePage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CreateListingPage } from './pages/CreateListingPage'
+import { useAuthSync } from './hooks/useAuthSync'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth()
@@ -19,7 +20,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export default function App() {
+function AppRoutes() {
+  // Se ejecuta una vez por sesion automaticamente
+  useAuthSync()
+
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -47,4 +51,8 @@ export default function App() {
       </Route>
     </Routes>
   )
+}
+
+export default function App() {
+  return <AppRoutes />
 }
