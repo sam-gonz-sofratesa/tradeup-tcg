@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/tanstack-start'
+import { useAuth } from '@clerk/clerk-react'
 
 const BASE = import.meta.env['VITE_API_URL'] ?? 'http://localhost:3001'
 
@@ -11,16 +11,13 @@ async function authFetch(token: string | null, path: string, init: RequestInit =
       ...(init.headers ?? {}),
     },
   })
-
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error((body as any)?.error ?? `HTTP ${res.status}`)
   }
-
   return res.json()
 }
 
-// ─ Public ──────────────────────────────────────────────────────────────
 export const api = {
   listings: {
     list: (params?: Record<string, string>) => {
@@ -41,7 +38,6 @@ export const api = {
   },
 }
 
-// ─ Authenticated ─────────────────────────────────────────────────────
 export function useApi() {
   const { getToken } = useAuth()
 
@@ -54,28 +50,10 @@ export function useApi() {
     auth: {
       sync: () => authed('/api/auth/sync', { method: 'POST' }),
     },
-    listings: {
-      create: (data: FormData) =>
-        getToken().then((token) =>
-          fetch(`${BASE}/api/listings`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: data,
-          }).then((r) => r.json())
-        ),
-      update: (id: string, data: FormData) =>
-        getToken().then((token) =>
-          fetch(`${BASE}/api/listings/${id}`, {
-            method: 'PATCH',
-            headers: { Authorization: `Bearer ${token}` },
-            body: data,
-          }).then((r) => r.json())
-        ),
-      delete: (id: string) => authed(`/api/listings/${id}`, { method: 'DELETE' }),
-    },
     offers: {
       list: () => authed('/api/offers'),
-      create: (data: object) => authed('/api/offers', { method: 'POST', body: JSON.stringify(data) }),
+      create: (data: object) =>
+        authed('/api/offers', { method: 'POST', body: JSON.stringify(data) }),
       accept: (id: string) => authed(`/api/offers/${id}/accept`, { method: 'POST' }),
       decline: (id: string) => authed(`/api/offers/${id}/decline`, { method: 'POST' }),
       cancel: (id: string) => authed(`/api/offers/${id}/cancel`, { method: 'POST' }),
@@ -86,6 +64,17 @@ export function useApi() {
     },
     transactions: {
       list: (page = 1) => authed(`/api/transactions/me?page=${page}`),
+    },
+    listings: {
+      create: async (data: FormData) => {
+        const token = await getToken()
+        return fetch(`${BASE}/api/listings`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token ?? ''}` },
+          body: data,
+        }).then((r) => r.json())
+      },
+      delete: (id: string) => authed(`/api/listings/${id}`, { method: 'DELETE' }),
     },
   }
 }

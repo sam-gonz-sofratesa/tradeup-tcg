@@ -16,9 +16,7 @@
   --radius-card: 0.75rem;
 }
 
-* {
-  border-color: var(--color-border);
-}
+* { border-color: var(--color-border); }
 
 body {
   background-color: var(--color-surface);
@@ -27,13 +25,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--color-surface); }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
 
-/* Card hover glow */
 .card-glow {
   transition: box-shadow 0.25s ease, transform 0.25s ease;
 }

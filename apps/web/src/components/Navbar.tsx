@@ -1,11 +1,13 @@
-import { Link } from '@tanstack/react-router'
-import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/tanstack-start'
+import { Link, NavLink } from 'react-router-dom'
+import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react'
 
 export function Navbar() {
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    `hover:text-white transition-colors ${isActive ? 'text-white font-medium' : 'text-[var(--color-muted)]'}`
+
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)]/90 backdrop-blur-md">
       <nav className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-        {/* Logo */}
         <Link to="/" className="flex items-center gap-2 shrink-0">
           <span className="text-2xl">🃏</span>
           <span className="font-display font-bold text-lg tracking-tight text-white">
@@ -14,34 +16,14 @@ export function Navbar() {
           </span>
         </Link>
 
-        {/* Nav links */}
-        <div className="hidden md:flex items-center gap-6 text-sm text-[var(--color-muted)]">
-          <Link
-            to="/marketplace"
-            className="hover:text-white transition-colors"
-            activeProps={{ className: 'text-white font-medium' }}
-          >
-            Marketplace
-          </Link>
-          <Link
-            to="/store"
-            className="hover:text-white transition-colors"
-            activeProps={{ className: 'text-white font-medium' }}
-          >
-            Tienda
-          </Link>
+        <div className="hidden md:flex items-center gap-6 text-sm">
+          <NavLink to="/marketplace" className={linkClass}>Marketplace</NavLink>
+          <NavLink to="/store" className={linkClass}>Tienda</NavLink>
           <SignedIn>
-            <Link
-              to="/dashboard"
-              className="hover:text-white transition-colors"
-              activeProps={{ className: 'text-white font-medium' }}
-            >
-              Dashboard
-            </Link>
+            <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
           </SignedIn>
         </div>
 
-        {/* Auth */}
         <div className="flex items-center gap-3">
           <SignedOut>
             <SignInButton mode="modal">
@@ -51,13 +33,7 @@ export function Navbar() {
             </SignInButton>
           </SignedOut>
           <SignedIn>
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox: 'w-8 h-8',
-                },
-              }}
-            />
+            <UserButton appearance={{ elements: { avatarBox: 'w-8 h-8' } }} />
           </SignedIn>
         </div>
       </nav>
