@@ -1,0 +1,12 @@
+{
+  "name": "@tradeup/db",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "dependencies": {
+    "mongoose": "^8.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

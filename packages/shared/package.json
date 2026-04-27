@@ -1,0 +1,9 @@
+{
+  "name": "@tradeup/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

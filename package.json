@@ -1,0 +1,19 @@
+{
+  "name": "tradeup-tcg",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --parallel dev --filter=*",
+    "build": "bun run --parallel build --filter=*",
+    "lint": "bun run --parallel lint --filter=*",
+    "typecheck": "bun run --parallel typecheck --filter=*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/node": "^20.12.0"
+  }
+}
