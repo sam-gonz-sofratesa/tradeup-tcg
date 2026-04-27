@@ -6,15 +6,7 @@ export const webhookRoutes = new Hono()
 
 /**
  * POST /webhooks/stripe
- *
- * Stripe sends events here. Raw body is required for signature verification,
- * so this route must be mounted BEFORE any JSON body parsers.
- *
- * Key events handled:
- *  - payment_intent.succeeded   → complete B2C transaction, reduce stock
- *  - payment_intent.canceled    → mark transaction failed (offer expired/declined)
- *  - payment_intent.payment_failed → mark transaction failed
- *  - account.updated            → sync Stripe Connect status to User
+ * Debe montarse ANTES de cualquier JSON body parser (necesita raw body).
  */
 webhookRoutes.post('/stripe', async (c) => {
   const signature = c.req.header('stripe-signature')
@@ -38,22 +30,20 @@ webhookRoutes.post('/stripe', async (c) => {
   try {
     switch (event.type) {
 
-      // ── B2C purchase completed ──────────────────────────────────────────────
+      // ── B2C purchase completed ────────────────────────────────────────────
       case 'payment_intent.succeeded': {
         const pi = event.data.object
         const { type, storeItemId } = pi.metadata
 
-        if (type === 'b2c' && storeItemId) {
-          // Reduce stock
+        if (type === 'store_purchase' && storeItemId) {
+          // Reducir stock
           await StoreItem.findByIdAndUpdate(storeItemId, { $inc: { stock: -1 } })
-          // Complete the transaction
+          // Completar la transaction que se creó en store-intent
           await Transaction.findOneAndUpdate(
             { stripePaymentIntentId: pi.id },
             { status: 'completed' }
           )
-        } else {
-          // C2C money transaction — already captured in accept flow,
-          // but mark completed in case of async capture confirmation
+        } else if (type === 'c2c') {
           await Transaction.findOneAndUpdate(
             { stripePaymentIntentId: pi.id, status: 'pending' },
             { status: 'completed', reviewEligible: true }
@@ -62,7 +52,7 @@ webhookRoutes.post('/stripe', async (c) => {
         break
       }
 
-      // ── Payment failed ──────────────────────────────────────────────────────
+      // ── Payment failed ────────────────────────────────────────────────────
       case 'payment_intent.payment_failed': {
         const pi = event.data.object
         await Transaction.findOneAndUpdate(
@@ -73,7 +63,7 @@ webhookRoutes.post('/stripe', async (c) => {
         break
       }
 
-      // ── Payment intent cancelled (offer declined / expired) ─────────────────
+      // ── Cancelled ─────────────────────────────────────────────────────────
       case 'payment_intent.canceled': {
         const pi = event.data.object
         await Transaction.findOneAndUpdate(
@@ -83,7 +73,7 @@ webhookRoutes.post('/stripe', async (c) => {
         break
       }
 
-      // ── Stripe Connect account updated ──────────────────────────────────────
+      // ── Stripe Connect account updated ────────────────────────────────────
       case 'account.updated': {
         const account = event.data.object
         const isActive =
@@ -93,11 +83,8 @@ webhookRoutes.post('/stripe', async (c) => {
 
         await User.findOneAndUpdate(
           { stripeConnectAccountId: account.id },
-          {
-            stripeConnectStatus: isActive ? 'active' : 'pending',
-          }
+          { stripeConnectStatus: isActive ? 'active' : 'pending' }
         )
-        console.log(`Stripe Connect account ${account.id} status: ${isActive ? 'active' : 'pending'}`)
         break
       }
 
@@ -106,7 +93,6 @@ webhookRoutes.post('/stripe', async (c) => {
     }
   } catch (err) {
     console.error(`Error processing Stripe event ${event.type}:`, err)
-    // Still return 200 so Stripe doesn't retry — log and handle manually
   }
 
   return c.json({ received: true })

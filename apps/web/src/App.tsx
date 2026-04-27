@@ -8,6 +8,7 @@ import { StorePage } from './pages/StorePage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CreateListingPage } from './pages/CreateListingPage'
 import { UserProfilePage } from './pages/UserProfilePage'
+import { OrdersPage } from './pages/OrdersPage'
 import { useAuthSync } from './hooks/useAuthSync'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -37,6 +38,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <ProtectedRoute>
+              <OrdersPage />
             </ProtectedRoute>
           }
         />

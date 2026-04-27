@@ -1,32 +1,35 @@
 import { Hono } from 'hono'
 import { requireAuth, requireAdmin } from '../lib/clerk.js'
-import { Transaction, User } from '@tradeup/db'
+import { Transaction, User, StoreItem } from '@tradeup/db'
 
 export const transactionRoutes = new Hono()
 
-// ─── GET /api/transactions/me — auth ─────────────────────────────────────────
+// ─── GET /api/transactions/me — mis pedidos ───────────────────────────────────
 transactionRoutes.get('/me', requireAuth, async (c) => {
   const clerkId = c.get('userId')
-  const { page = '1' } = c.req.query()
+  const { page = '1', type } = c.req.query()
   const pageNum = Math.max(Number(page) || 1, 1)
 
   const user = await User.findOne({ clerkId })
   if (!user) return c.json({ error: 'User not synced' }, 400)
 
-  const transactions = await Transaction.find({
+  const filter: Record<string, unknown> = {
     $or: [{ buyer: user._id }, { seller: user._id }],
-  })
-    .populate('offer')
-    .populate('buyer', 'username')
-    .populate('seller', 'username')
-    .sort({ createdAt: -1 })
-    .skip((pageNum - 1) * 20)
-    .limit(20)
+  }
+  if (type) filter['type'] = type
 
-  const total = await Transaction.countDocuments({
-    $or: [{ buyer: user._id }, { seller: user._id }],
-  })
+  const [transactions, total] = await Promise.all([
+    Transaction.find(filter)
+      .populate('offer')
+      .populate('buyer', 'username')
+      .populate('seller', 'username')
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * 20)
+      .limit(20),
+    Transaction.countDocuments(filter),
+  ])
 
+  // Para B2C enriquecer con info del storeItem via stripePaymentIntentId metadata
   return c.json({ transactions, total, page: pageNum })
 })
 

@@ -76,6 +76,14 @@ export function useApi() {
       storeIntent: (body: { storeItemId: string }) =>
         authRequest('/api/payments/store-intent', { method: 'POST', body: JSON.stringify(body) }),
     },
+    transactions: {
+      me: (params?: { page?: number; type?: string }) => {
+        const qs = params ? '?' + new URLSearchParams(
+          Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
+        ).toString() : ''
+        return authRequest(`/api/transactions/me${qs}`)
+      },
+    },
     dashboard: {
       get: () => authRequest('/api/users/me/dashboard'),
       stripeOnboard: () => authRequest('/api/users/me/stripe-onboard', { method: 'POST' }),

@@ -1,14 +1,12 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/clerk.js'
 import { stripe, calculateCommission } from '../lib/stripe.js'
-import { User, Listing, StoreItem } from '@tradeup/db'
+import { User, Listing, StoreItem, Transaction } from '@tradeup/db'
 
 export const paymentRoutes = new Hono()
 
 /**
  * POST /api/payments/c2c-intent
- * Buyer creates a PaymentIntent hold when submitting a money/mixed offer.
- * Returns client_secret to complete with Stripe Elements on the frontend.
  */
 paymentRoutes.post('/c2c-intent', requireAuth, async (c) => {
   const clerkId = c.get('userId')
@@ -40,13 +38,13 @@ paymentRoutes.post('/c2c-intent', requireAuth, async (c) => {
     capture_method: 'manual',
     metadata: {
       platform: 'tradeup',
+      type: 'c2c',
       listingId,
       buyerMongoId: String(buyer._id),
       sellerMongoId: String(seller._id),
     },
   }
 
-  // Only add transfer + fee if seller has Stripe Connect active
   if (seller.stripeConnectStatus === 'active' && seller.stripeConnectAccountId) {
     intentParams.transfer_data = { destination: seller.stripeConnectAccountId }
     intentParams.application_fee_amount = commission
@@ -65,8 +63,8 @@ paymentRoutes.post('/c2c-intent', requireAuth, async (c) => {
 
 /**
  * POST /api/payments/store-intent
- * B2C: TradeUp is the merchant — no transfer_data, no application_fee_amount.
- * Revenue goes directly to TradeUp's Stripe account.
+ * B2C — crea la Transaction aqui mismo en estado 'pending'.
+ * El webhook la completa cuando Stripe confirma el pago.
  */
 paymentRoutes.post('/store-intent', requireAuth, async (c) => {
   const clerkId = c.get('userId')
@@ -82,7 +80,7 @@ paymentRoutes.post('/store-intent', requireAuth, async (c) => {
   if (!item) return c.json({ error: 'Item not found' }, 404)
   if (!item.isActive || item.stock < 1) return c.json({ error: 'Item out of stock' }, 400)
 
-  // B2C: straight charge to TradeUp — NO application_fee_amount, NO transfer_data
+  // B2C: sin transfer_data ni application_fee_amount
   const paymentIntent = await stripe.paymentIntents.create({
     amount: item.price,
     currency: 'usd',
@@ -93,6 +91,18 @@ paymentRoutes.post('/store-intent', requireAuth, async (c) => {
       storeItemId,
       buyerMongoId: String(buyer._id),
     },
+  })
+
+  // Crear Transaction en estado pending para que el webhook la encuentre
+  // seller = buyer aqui (TradeUp no tiene un User vendedor separado),
+  // usamos el mismo buyer como placeholder; el webhook solo actualiza status.
+  await Transaction.create({
+    buyer: buyer._id,
+    seller: buyer._id,   // B2C: TradeUp es el vendedor, no hay User seller
+    type: 'b2c',
+    grossAmount: item.price,
+    stripePaymentIntentId: paymentIntent.id,
+    status: 'pending',
   })
 
   return c.json({
