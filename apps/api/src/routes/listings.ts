@@ -4,12 +4,6 @@ import { z } from "zod";
 import { requireAuth } from "../lib/clerk.js";
 import { saveFile } from "../lib/storage.js";
 import { Listing, User, CatalogCard } from "@tradeup/db";
-import { Hono } from "hono";
-import { bodyLimit } from "hono/body-limit";
-import { z } from "zod";
-import { requireAuth } from "../lib/clerk.js";
-import { saveFile } from "../lib/storage.js";
-import { Listing, User, CatalogCard } from "@tradeup/db";
 
 export const listingRoutes = new Hono();
 
