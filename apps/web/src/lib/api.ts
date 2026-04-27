@@ -83,10 +83,37 @@ export function useApi() {
         ).toString() : ''
         return authRequest(`/api/transactions/me${qs}`)
       },
+      get: (id: string) => authRequest(`/api/transactions/${id}`),
+      review: (id: string, body: { rating: number; comment?: string }) =>
+        authRequest(`/api/transactions/${id}/review`, { method: 'POST', body: JSON.stringify(body) }),
+    },
+    notifications: {
+      summary: () => authRequest('/api/notifications/summary'),
     },
     dashboard: {
       get: () => authRequest('/api/users/me/dashboard'),
       stripeOnboard: () => authRequest('/api/users/me/stripe-onboard', { method: 'POST' }),
+    },
+    admin: {
+      metrics: () => authRequest('/api/admin/metrics'),
+      users: (params?: { page?: number; search?: string; role?: string }) => {
+        const qs = params ? '?' + new URLSearchParams(
+          Object.fromEntries(Object.entries(params).filter(([,v]) => v !== undefined).map(([k,v]) => [k, String(v)]))
+        ).toString() : ''
+        return authRequest(`/api/admin/users${qs}`)
+      },
+      banUser: (id: string, banned: boolean) =>
+        authRequest(`/api/admin/users/${id}/ban`, { method: 'PATCH', body: JSON.stringify({ banned }) }),
+      setRole: (id: string, role: string) =>
+        authRequest(`/api/admin/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+      transactions: (params?: { page?: number; status?: string; type?: string }) => {
+        const qs = params ? '?' + new URLSearchParams(
+          Object.fromEntries(Object.entries(params).filter(([,v]) => v !== undefined).map(([k,v]) => [k, String(v)]))
+        ).toString() : ''
+        return authRequest(`/api/transactions${qs}`)
+      },
+      updateShipping: (id: string, shippingStatus: string) =>
+        authRequest(`/api/admin/transactions/${id}/shipping`, { method: 'PATCH', body: JSON.stringify({ shippingStatus }) }),
     },
     users: {
       profile: (id: string) => authRequest(`/api/users/${id}/profile`),
